@@ -1,5 +1,3 @@
-//IMPORTS
-const { useState } = require("react");
 const Product = require("../model/product");
 
 // GET PRODUCT UPLOAD FORM PAGE
