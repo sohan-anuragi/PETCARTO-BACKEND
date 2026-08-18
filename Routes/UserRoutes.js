@@ -6,6 +6,7 @@ const userRouter = express.Router();
 const UserControllers = require("../Controllers/UserControllers");
 const AuthControllers = require("../Controllers/AuthControllers");
 const authModel = require("../model/authModel");
+const { upload } = require("../multer");
 
 //GET PRODUCTS LIST FOR USERS
 userRouter.get("/product-list", UserControllers.getProductList);
@@ -43,6 +44,45 @@ userRouter.get(
   "/cart-list",
   AuthControllers.authenticated,
   UserControllers.getCartList,
+);
+
+//HANDLE PATCH PRODUCT QUANTITY IN CARTLIST
+userRouter.patch(
+  "/product-quantity",
+  AuthControllers.authenticated,
+  UserControllers.patchQuantity,
+);
+
+//HANDLE DELETE CART PRODUCT FROM CARTLIST
+userRouter.delete(
+  "/remove-cart-product",
+  AuthControllers.authenticated,
+  UserControllers.removeCartProduct,
+);
+
+//HANDLE FETCH USER REQUEST LOGGED IN OR NOT
+userRouter.get("/user", AuthControllers.authenticated, UserControllers.getUser);
+
+//HANDLE PROFILE PIC SAVE
+userRouter.post(
+  "/user-profilepic",
+  AuthControllers.authenticated,
+  upload.single("profilePic"),
+  UserControllers.postProfilePic,
+);
+
+//HANDLE ADDRESS SAVE REQUEST
+userRouter.post(
+  "/save-address",
+  AuthControllers.authenticated,
+  UserControllers.saveAddress,
+);
+
+//FETCH ADDRESS API
+userRouter.get(
+  "/user-address",
+  AuthControllers.authenticated,
+  UserControllers.fetchUserAddress,
 );
 
 module.exports = userRouter;

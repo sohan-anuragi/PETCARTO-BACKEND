@@ -91,7 +91,7 @@ const handleLogin = async (req, res) => {
 //AUTHENTICATE THE USER IS LOGGED IN OR NOT
 const authenticated = async (req, res, next) => {
   const token = req.cookies.token;
-  console.log(token);
+  console.log("TOKEN OF USER-->", token);
 
   if (!token) {
     return res.status(401).json({

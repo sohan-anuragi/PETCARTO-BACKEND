@@ -2,6 +2,10 @@ const Product = require("../model/product");
 const product = require("../model/product");
 const WishList = require("../model/userModels/WishListModel");
 const CartList = require("../model/userModels/CartModel");
+const User = require("../model/authModel");
+const Address = require("../model/userModels/AddressModel");
+const fs = require("fs");
+const path = require("path");
 
 //Get Product List
 const getProductList = async (req, res, next) => {
@@ -138,6 +142,7 @@ const getAddToCart = async (req, res) => {
 
   try {
     const List = await CartList.findOne({ userId: user });
+
     //if user cartlist does not  exist
     if (!List) {
       const newCartList = new CartList({
@@ -164,17 +169,20 @@ const getAddToCart = async (req, res) => {
         });
       }
     }
-    // when user exist already
 
+    // when user exist already
     const exist = List.cartProducts.some(
       (item) => item.productId.toString() === productId.toString(),
     );
 
     console.log(exist);
     if (exist) {
-      List.cartProducts = List.cartProducts.filter(
-        (item) => item.productId.toString() !== productId.toString(),
-      );
+      List.cartProducts = List.cartProducts.map((item) => {
+        if (item.productId.toString() === productId.toString()) {
+          item.quantity += 1;
+        }
+        return item;
+      });
     } else {
       List.cartProducts = [...List.cartProducts, { productId, quantity }];
     }
@@ -208,11 +216,17 @@ const getCartList = async (req, res) => {
   const user = req.user.id;
   try {
     const cartListObj = await CartList.findOne({ userId: user });
-    const cartList = cartListObj.cartProducts;
+    const cartListOnly = cartListObj.cartProducts;
+    const cartProductsIds = cartListOnly.map((item) => {
+      return item.productId;
+    });
+    const CartProducts = await Product.find({ _id: { $in: cartProductsIds } });
+    // console.log(CartProducts);
     return res.status(200).json({
       success: true,
       message: "CartList found successfully",
-      cartList,
+      cartList: CartProducts,
+      cartProductsIds: cartListOnly,
     });
   } catch (err) {
     console.log("ERRORE WHILE CARTLIST FETCHING FROM DB -->", err);
@@ -223,10 +237,202 @@ const getCartList = async (req, res) => {
   }
 };
 
+//HANDLE PATHC QUANTITY OF CARTPRODUCTSa
+const patchQuantity = async (req, res) => {
+  const user = req.user.id;
+  const { productId, action } = req.body;
+
+  try {
+    if (action === "increase") {
+      await CartList.updateOne(
+        { userId: user, "cartProducts.productId": productId },
+        { $inc: { "cartProducts.$.quantity": 1 } },
+      );
+      return res.json({
+        success: true,
+        message: "Product quanitity increase successfully",
+      });
+    } else {
+      await CartList.updateOne(
+        { userId: user, "cartProducts.productId": productId },
+        { $inc: { "cartProducts.$.quantity": -1 } },
+      );
+      return res.json({
+        success: true,
+        message: "Product quanitity decrease successfully",
+      });
+    }
+  } catch (err) {
+    console.log(err);
+    return res.json({
+      success: false,
+      message: "ERRORE WHILE QUANTITY INCREASE OR DECREASE IN DB",
+    });
+  }
+};
+
+//HANDLE DELETE CART PRODUCT REQUEST
+const removeCartProduct = async (req, res) => {
+  const { productId } = req.body;
+  const user = req.user.id;
+  console.log(productId);
+
+  try {
+    await CartList.updateOne(
+      { userId: user },
+      {
+        $pull: {
+          cartProducts: {
+            productId: productId,
+          },
+        },
+      },
+    );
+    res.json({
+      success: true,
+      message: "product remove from cartList successfully",
+    });
+  } catch (err) {
+    console.log("ERRORE WHILE REMOVE PRODUCT FORM CARTLIST", err);
+    res.json({
+      success: false,
+      message: "Errore while remove product from CartList",
+    });
+  }
+};
+
+//HANDLE FETCH USER REQUEST
+const getUser = async (req, res) => {
+  try {
+    const loggedUser = await User.findById(req.user.id);
+    const loggedUserObj = {
+      firstName: loggedUser.firstName,
+      lastName: loggedUser.lastName,
+      email: loggedUser.email,
+      profilePic: loggedUser.profilePic,
+    };
+    res.json({
+      success: true,
+      loggedUserObj,
+    });
+  } catch (err) {
+    console.log("ERRORE WHILE USER FETCH FROME DB", err);
+    res.json({
+      success: false,
+      messege: "Errore while user fetch from db",
+    });
+  }
+};
+
+//HANDLE POST PROFILEPIC
+const postProfilePic = async (req, res) => {
+  const userId = req.user.id;
+  const profilePic = req.file;
+  const { firstName, lastName, remove } = req.body;
+  console.log("in the Bakcned------>", req.body);
+  console.log("profile pic in backend--> ", profilePic);
+  let userObj = {};
+  try {
+    userObj = await User.findById(userId);
+    console.log("userObj-->", userObj);
+  } catch (err) {
+    console.log("ERRORE WHILE USER FETCH FROM DB", err);
+    return res.json({
+      messgae: "ERRORE WHILE USER FETCH FROM DB IN PROFILEPIC BLOCK",
+      succes: false,
+    });
+  }
+
+  if (remove === "remove") {
+    const oldProfilePic = userObj.profilePic;
+    const imagePath = path.join("uploads", oldProfilePic);
+
+    if (fs.existsSync(imagePath)) {
+      try {
+        fs.unlinkSync(imagePath);
+        console.log("Image deleted successfully");
+      } catch (err) {
+        console.log("Error while deleting image:", err);
+      }
+    }
+
+    userObj.profilePic = null;
+  }
+
+  if (profilePic) {
+    userObj.profilePic = profilePic.filename;
+  }
+
+  userObj.firstName = firstName;
+  userObj.lastName = lastName;
+
+  console.log("modified userObj--> ", userObj);
+  try {
+    await userObj.save();
+    return res.json({
+      message: "user Profile Update Successfully",
+      success: true,
+    });
+    console.log("userObj save succeslfully");
+  } catch (err) {
+    console.log("errore while profilePic save in db".err);
+    return res.json({
+      success: false,
+      message: "errore while profilePic save in db",
+    });
+  }
+};
+
+//HANDLE SAVE ADDRESS REQUEST
+const saveAddress = async (req, res) => {
+  try {
+    const address = await Address.findOneAndUpdate(
+      { userId: req.user.id },
+      { ...req.body },
+      { new: true, upsert: true, runValidators: true },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Address saved successfully",
+      address,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// FETCH USER ADDRESS
+const fetchUserAddress = async (req, res) => {
+  try {
+    const address = await Address.findOne({ userId: req.user.id });
+
+    res.status(200).json({
+      success: true,
+      address,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
+  getUser,
+  fetchUserAddress,
+  saveAddress,
+  postProfilePic,
   getProductList,
   postLikeProduct,
   getWishList,
   getOnlyWishList,
   getAddToCart,
+  getCartList,
+  patchQuantity,
+  removeCartProduct,
 };

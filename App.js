@@ -3,10 +3,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const app = express();
-const multer = require("multer");
 const path = require("path");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const multer = require("multer");
 
 // ROUTERS
 
@@ -27,7 +27,7 @@ app.use(
       "http://127.0.0.1:3000",
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -41,43 +41,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // MULTER SETUP
-
-// CONFIGURE WHERE AND HOW TO STORE UPLOADED FILES
-const storage = multer.diskStorage({
-  // SET DESTINATION FOLDER FOR UPLOADS
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  // SET FILENAME FORMAT (TIMESTAMP + ORIGINAL NAME FOR UNIQUENESS)
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-
-// CONFIGURE FILE FILTER TO ONLY ALLOW IMAGE FILES
-const fileFilter = (req, file, cb) => {
-  // ALLOWED IMAGE EXTENSIONS
-  const allowedTypes = /jpeg|jpg|png|webp/;
-  const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowedTypes.test(file.mimetype);
-
-  // ALLOW ONLY VALID IMAGE FILES
-  if (ext && mime) {
-    cb(null, true);
-  } else {
-    cb(new Error("ONLY IMAGE FILES ARE ALLOWED"));
-  }
-};
-
-// CREATE MULTER INSTANCE WITH STORAGE, FILTER, AND FILE SIZE LIMITS
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    // SET MAXIMUM FILE SIZE TO 2MB PER IMAGE
-    fileSize: 2 * 1024 * 1024,
-  },
-});
+// yhaa per tha
 
 // LOGGING MIDDLEWARE
 
@@ -105,7 +69,7 @@ app.use("/home", (req, res) => {
 });
 
 // ADMIN ROUTES (PASS UPLOAD MIDDLEWARE TO ROUTER)
-app.use(adminRouter(upload));
+app.use(adminRouter);
 // USER ROUTES
 app.use(userRouter);
 //AUTH ROUTES
@@ -131,13 +95,13 @@ app.use((err, req, res, next) => {
     }
     return res.status(400).json({
       success: false,
-      message: err.message,
+      message: { "yhaa errore1": err.message },
     });
   }
 
   // HANDLE OTHER ERRORS
   if (err) {
-    console.error("ERROR:", err.message);
+    console.error("ERROR-->", err.message);
     return res.status(500).json({
       success: false,
       message: err.message || "INTERNAL SERVER ERROR",
